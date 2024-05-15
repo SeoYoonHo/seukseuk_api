@@ -1,18 +1,22 @@
 package com.lsyh.seukseuk.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.DayOfWeek;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Entity
-@Data
+@Getter @Setter
 @EqualsAndHashCode(callSuper=false)
 public class Employee extends BaseTimeEntity{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "employee_id")
     private Long id;
     private String name;
     private Integer age;
@@ -20,8 +24,11 @@ public class Employee extends BaseTimeEntity{
     private String gender;
     private String tel;
 
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL)
+    private List<EmployeeWorkingDay> workingDayList = new ArrayList<>();
+
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "employee_working_days", joinColumns = @JoinColumn(name = "employee_id"))
+    @CollectionTable(name = "employee_working_day_of_weeks", joinColumns = @JoinColumn(name = "employee_id"))
     @MapKeyColumn(name = "day_of_week")
     @MapKeyEnumerated(EnumType.STRING)
     @Column(name = "wage")

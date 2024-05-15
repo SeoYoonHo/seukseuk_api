@@ -2,6 +2,7 @@ package com.lsyh.seukseuk.dto;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import java.time.DayOfWeek;
 import java.util.Map;
@@ -60,5 +61,12 @@ public class EmployeeDTO {
 
             return sb.toString();
         }
+    }
+
+    @Getter @Setter @ToString
+    public static class EmployeeWorkingDayRequest {
+        private String name;
+        private Integer year;
+        private Integer month;
     }
 }
