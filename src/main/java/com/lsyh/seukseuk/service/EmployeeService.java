@@ -4,7 +4,6 @@ import com.lsyh.seukseuk.domain.Employee;
 import com.lsyh.seukseuk.domain.EmployeeWorkingDay;
 import com.lsyh.seukseuk.domain.Holiday;
 import com.lsyh.seukseuk.dto.EmployeeDTO;
-import com.lsyh.seukseuk.dto.HolidayDTO;
 import com.lsyh.seukseuk.mapper.EmployeeMapper;
 import com.lsyh.seukseuk.repository.EmployeeRepository;
 import com.lsyh.seukseuk.repository.EmployeeWorkingDayRepository;
@@ -71,24 +70,19 @@ public class EmployeeService {
     public EmployeeDTO.EmployeeSalaryResponse setSalary(Employee employee, LocalDate currentDate) {
         Month month = currentDate.getMonth();
         Year year = Year.of(currentDate.getYear());
-
-        EmployeeDTO.EmployeeSalaryResponse employeeSalaryResponse = EmployeeMapper.INSTANCE.employeeToEmployeeSalaryResponseDto(employee);
-        Map<DayOfWeek, Integer> dailyWages = employeeSalaryResponse.getDailyWages();
-        List<LocalDate> holidayList = holidayRepository.findHolidaysByMonthAndYear(month.getValue(), year.getValue())
-                                                       .stream()
-                                                       .map(Holiday::getDate)
-                                                       .toList();
-
-        Integer salary = 0;
         LocalDate startOfMonth = LocalDate.of(year.getValue(), month, 1);
         LocalDate endOfMonth = startOfMonth.with(TemporalAdjusters.lastDayOfMonth());
 
-        for (LocalDate date = startOfMonth; date.isBefore(endOfMonth.plusDays(1)); date = date.plusDays(1)) {
-            if (dailyWages.keySet()
-                          .contains(date.getDayOfWeek()) && !holidayList.contains(date)) {
-                salary += dailyWages.get(date.getDayOfWeek());
+        List<EmployeeWorkingDay> employeeWorkingDayList = employeeWorkingDayRepository.findEmployeeWorkingDaysByEmployeeAndDateRange(employee.getId(), startOfMonth, endOfMonth);
+        Map<DayOfWeek, Integer> dailyWages = employee.getDailyWages();
+        Integer salary = 0;
+        for (EmployeeWorkingDay employeeWorkingDay : employeeWorkingDayList) {
+            if (employeeWorkingDay.isWorking()) {
+                salary += dailyWages.get(employeeWorkingDay.getDate().getDayOfWeek());
             }
         }
+
+        EmployeeDTO.EmployeeSalaryResponse employeeSalaryResponse = EmployeeMapper.INSTANCE.employeeToEmployeeSalaryResponseDto(employee);
         employeeSalaryResponse.setSalary(salary);
 
         return employeeSalaryResponse;
@@ -109,6 +103,10 @@ public class EmployeeService {
         Optional<Employee> optionalEmployee = employeeRepository.findEmployeeByName(employeeWorkingDayRequest.getName());
         Employee employee = optionalEmployee.orElseThrow();
 
+        LocalDate startOfMonth = LocalDate.of(employeeWorkingDayRequest.getYear(), employeeWorkingDayRequest.getMonth(), 1);
+        LocalDate endOfMonth = startOfMonth.with(TemporalAdjusters.lastDayOfMonth());
+        List<EmployeeWorkingDay> AlreadyEmployeeWorkingDayList = employeeWorkingDayRepository.findEmployeeWorkingDaysByEmployeeAndDateRange(employee.getId(), startOfMonth, endOfMonth);
+
         // 1. 휴일목록 가져오기
         YearMonth yearMonth = YearMonth.of(employeeWorkingDayRequest.getYear(), employeeWorkingDayRequest.getMonth());
         LocalDate startDate = yearMonth.atDay(1);
@@ -124,6 +122,21 @@ public class EmployeeService {
         List<EmployeeWorkingDay> employeeWorkingDayList = new ArrayList<>();
         for (DayOfWeek dayOfWeek : workingDayMap.keySet()) {
             for (LocalDate workingDay : workingDayMap.get(dayOfWeek)) {
+
+                // 이미 존재하는 경우 건너뛰기
+                boolean isOk = true;
+                for(EmployeeWorkingDay alreadyEmployeeWorkingDay : AlreadyEmployeeWorkingDayList){
+                    if(alreadyEmployeeWorkingDay.getDate().equals(workingDay)) {
+                        isOk = false;
+                        AlreadyEmployeeWorkingDayList.remove(alreadyEmployeeWorkingDay);
+                        break;
+                    }
+                }
+                if(!isOk){
+                    continue;
+                }
+
+                // 존재하지 않는 경우만 아래 로직 수행
                 EmployeeWorkingDay employeeWorkingDay = new EmployeeWorkingDay();
                 employeeWorkingDay.setEmployee(employee);
                 employeeWorkingDay.setDate(workingDay);
